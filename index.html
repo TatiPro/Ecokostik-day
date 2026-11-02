@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>День Костика</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #e8f5e9 0%, #f1f8e9 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #2e3d2f;
+  }
+  .app {
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 28px 24px;
+    box-shadow: 0 10px 40px rgba(60, 100, 60, 0.15);
+  }
+  .progress {
+    height: 6px;
+    background: #e0ebe0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #66bb6a, #43a047);
+    border-radius: 3px;
+    transition: width 0.35s ease;
+  }
+  .card {
+    animation: fadeIn 0.35s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .scene {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #81a884;
+    margin-bottom: 10px;
+  }
+  .question {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.35;
+    margin-bottom: 22px;
+  }
+  .option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 15px 18px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    font-family: inherit;
+    color: #2e3d2f;
+    background: #f6faf6;
+    border: 2px solid #e0ebe0;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+  }
+  .option:hover {
+    border-color: #a5d6a7;
+    background: #eef7ee;
+    transform: translateY(-1px);
+  }
+  .option:active { transform: scale(0.98); }
+  
+  .card {
+    position: relative;
+  }
+  .mascot {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+  }
+  .card .scene,
+  .card .question,
+  .card .result-title,
+  .card .result-sub {
+    padding-right: 84px;
+  }
+
+  /* Экран результата */
+  .result-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .result-sub {
+    font-size: 14px;
+    color: #6b7d6c;
+    margin-bottom: 24px;
+  }
+  .stat {
+    margin-bottom: 18px;
+  }
+  .stat-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .stat-track {
+    height: 12px;
+    background: #eef3ee;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .stat-fill {
+    height: 100%;
+    border-radius: 6px;
+    width: 0%;
+    transition: width 0.8s ease;
+  }
+  .fill-energy { background: linear-gradient(90deg, #ffb74d, #ff9800); }
+  .fill-harmony { background: linear-gradient(90deg, #81c784, #43a047); }
+  .verdict {
+    background: #f1f8e9;
+    border-left: 4px solid #81c784;
+    padding: 16px 18px;
+    border-radius: 10px;
+    font-size: 15px;
+    line-height: 1.5;
+    margin: 24px 0;
+  }
+  .btn {
+    width: 100%;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    color: #fff;
+    background: #43a047;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.18s;
+    margin-top: 8px;
+  }
+  .btn:hover { background: #388e3c; }
+  .btn-ghost {
+    background: transparent;
+    color: #43a047;
+    border: 2px solid #a5d6a7;
+  }
+  .btn-ghost:hover { background: #f1f8e9; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="progress"><div class="progress-bar" id="bar"></div></div>
+  <div id="stage"></div>
+</div>
+
+<script>
+/* ---------- Данные ---------- */
+const scenes = [
+  {
+    scene: "Утро · 7:40",
+    question: "Будильник ещё не звонил, но ты уже проснулся. Что делаешь?",
+    options: [
+      { text: "Лучше полежу, заодно проверю рабочие чаты", energy: -1, harmony: -1 },
+      { text: "Выйду на 10 минут подышать на балкон", energy: 1, harmony: 2 }
+    ]
+  },
+  {
+    scene: "Завтрак · 8:30",
+    question: "Чем заправишься перед делами?",
+    options: [
+      { text: "Кофе и что-нибудь на бегу", energy: 1, harmony: -1 },
+      { text: "Нормально поем, даже если это 15 минут", energy: 2, harmony: 1 }
+    ]
+  },
+  {
+    scene: "Дорога · 9:15",
+    question: "До места 15 минут. Как доберёшься?",
+    options: [
+      { text: "Вызову такси, чтобы не тратить силы", energy: 0, harmony: -1 },
+      { text: "Пройдусь пешком — заодно проветрюсь", energy: 1, harmony: 2 }
+    ]
+  },
+  {
+    scene: "Обед · 13:30",
+    question: "Перерыв. Что важнее?",
+    options: [
+      { text: "Продолжу работу, поем за ноутбуком", energy: -1, harmony: -2 },
+      { text: "Отойду от стола и поем без экрана", energy: 2, harmony: 2 }
+    ]
+  },
+  {
+    scene: "Вечер · 19:00",
+    question: "День закончился. Как переключаешься?",
+    options: [
+      { text: "Листаю ленту, пока не стемнеет", energy: -1, harmony: -1 },
+      { text: "Пройдусь или просто посижу в тишине", energy: 1, harmony: 2 }
+    ]
+  },
+  {
+    scene: "Ночь · 23:30",
+    question: "Телефон показывает 23:30. Что дальше?",
+    options: [
+      { text: "Ещё одну серию — и спать", energy: -2, harmony: -1 },
+      { text: "Экран в сторону, ложусь", energy: 2, harmony: 2 }
+    ]
+  },
+  {
+    scene: "Итог дня",
+    question: "Перед сном — одна мысль о себе. Какая?",
+    options: [
+      { text: "«Завтра надо всё успеть»", energy: -1, harmony: -1 },
+      { text: "«Сегодня я хотя бы что-то сделал для себя»", energy: 1, harmony: 2 }
+    ]
+  }
+];
+
+/* ---------- Логика ---------- */
+let index = 0;
+let energy = 0;
+let harmony = 0;
+
+const stage = document.getElementById('stage');
+const bar = document.getElementById('bar');
+const maxScore = 14; // приблизительный максимум по модулю для нормализации
+
+function render() {
+  bar.style.width = ((index) / scenes.length * 100) + '%';
+
+  if (index < scenes.length) {
+    const s = scenes[index];
+        stage.innerHTML = `
+      <div class="card">
+        <img src="kostik.jpeg" class="mascot" alt="Костик">
+        <div class="scene">${s.scene}</div>
+        <div class="question">${s.question}</div>
+   
+        ${s.options.map((o, i) => `
+          <button class="option" data-i="${i}">${o.text}</button>
+        `).join('')}
+      </div>
+    `;
+    stage.querySelectorAll('.option').forEach(btn => {
+      btn.addEventListener('click', () => choose(parseInt(btn.dataset.i)));
+    });
+  } else {
+    renderResult();
+  }
+}
+
+function choose(i) {
+  const opt = scenes[index].options[i];
+  energy += opt.energy;
+  harmony += opt.harmony;
+  index++;
+  render();
+}
+
+function normalize(v) {
+  // приводим к 0..100, где 50 — нейтрально
+  const pct = Math.round(50 + (v / maxScore) * 50);
+  return Math.max(0, Math.min(100, pct));
+}
+
+function verdictFor(e, h) {
+  if (e >= 4 && h >= 4)
+    return "Костик нашёл редкий баланс: и силы есть, и внутри спокойно. Так держать — но помни, что отдых тоже часть пути.";
+  if (e >= 4 && h < 4)
+    return "Энергии много, а гармонии пока меньше. Ты много делаешь — попробуй добавить немного тишины и пауз для себя.";
+  if (e < 4 && h >= 4)
+    return "Внутри спокойно, но силы на исходе. Ты умеешь заботиться о состоянии — добавь чуть больше движения и сна.";
+  return "День получился непростым. Это нормально — путь Костика тоже не с прямой линией. Начни с одной маленькой привычки завтра.";
+}
+
+function renderResult() {
+  bar.style.width = '100%';
+  const ePct = normalize(energy);
+  const hPct = normalize(harmony);
+  const verdict = verdictFor(energy, harmony);
+
+  stage.innerHTML = `
+    <div class="card">
+      <img src="kostik.jpeg" class="mascot" alt="Костик">
+      <div class="result-title">День прожит</div>
+      <div class="result-sub">Вот как прошёл день Костика.</div>
+
+      <div class="stat">
+        <div class="stat-head"><span>Энергия</span><span>${ePct}%</span></div>
+        <div class="stat-track"><div class="stat-fill fill-energy" id="f1"></div></div>
+      </div>
+
+      <div class="stat">
+        <div class="stat-head"><span>Гармония</span><span>${hPct}%</span></div>
+        <div class="stat-track"><div class="stat-fill fill-harmony" id="f2"></div></div>
+      </div>
+
+      <div class="verdict">${verdict}</div>
+
+      <button class="btn" id="again">Прожить ещё раз</button>
+    </div>
+  `;
+
+  // анимация заполнения
+  requestAnimationFrame(() => {
+    document.getElementById('f1').style.width = ePct + '%';
+    document.getElementById('f2').style.width = hPct + '%';
+  });
+
+  document.getElementById('again').addEventListener('click', () => {
+    index = 0; energy = 0; harmony = 0;
+    render();
+  });
+}
+
+render();
+</script>
+</body>
+</html>
