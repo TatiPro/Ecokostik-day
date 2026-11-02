@@ -91,6 +91,42 @@
     height: 72px;
     object-fit: contain;
   }
+    .intro {
+    text-align: center;
+  }
+  .intro .mascot {
+    position: static;
+    display: block;
+    width: 110px;
+    height: 110px;
+    margin: 0 auto 18px;
+  }
+  .intro-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .intro-text {
+    font-size: 15px;
+    line-height: 1.55;
+    color: #4a5c4b;
+    margin-bottom: 8px;
+  }
+  .intro-rules {
+    text-align: left;
+    background: #f1f8e9;
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin: 20px 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  .intro-rules li {
+    margin-left: 18px;
+    margin-bottom: 6px;
+  }
+  .intro-rules li:last-child { margin-bottom: 0; }
+
   .card .scene,
   .card .question,
   .card .result-title,
@@ -234,6 +270,7 @@ const scenes = [
 
 /* ---------- Логика ---------- */
 let index = 0;
+let started = false;
 let energy = 0;
 let harmony = 0;
 
@@ -242,6 +279,30 @@ const bar = document.getElementById('bar');
 const maxScore = 14; // приблизительный максимум по модулю для нормализации
 
 function render() {
+    if (!started) {
+    bar.style.width = '0%';
+    stage.innerHTML = `
+      <div class="card intro">
+        <img src="kostik.jpeg" class="mascot" alt="Костик">
+        <div class="intro-title">День Костика</div>
+        <div class="intro-text">Проживи один день за Костика и посмотри, куда ведут его маленькие выборы — к энергии и гармонии или к усталости.</div>
+        <div class="intro-rules">
+          <strong>Как играть:</strong>
+          <ul>
+            <li>7 коротких ситуаций — от утра до ночи</li>
+            <li>В каждой выбирай, как поступит Костик</li>
+            <li>В конце увидишь две шкалы: энергия и гармония</li>
+          </ul>
+        </div>
+        <button class="btn" id="startBtn">Начать день</button>
+      </div>
+    `;
+    document.getElementById('startBtn').addEventListener('click', () => {
+      started = true;
+      render();
+    });
+    return;
+  }
   bar.style.width = ((index) / scenes.length * 100) + '%';
 
   if (index < scenes.length) {
