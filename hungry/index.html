@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Костик проголодался</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #eef7ea;
+    color: #2e3d2f;
+    user-select: none;
+  }
+  #game {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  /* Верхняя панель */
+  .hud {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    padding: 14px 16px 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .hud-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5c4b;
+    margin-bottom: 8px;
+  }
+  .score { font-size: 16px; }
+  .hunger-track {
+    height: 18px;
+    background: #e2ece2;
+    border-radius: 9px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+  }
+  .bar-green {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #81c784, #43a047);
+    transition: width 0.25s ease;
+  }
+  .bar-red {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #ef9a9a, #e53935);
+    transition: width 0.25s ease;
+  }
+
+  /* Поле игры */
+  #field {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
+
+  /* Экран старта/итога */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(238, 247, 234, 0.96);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 24px;
+    text-align: center;
+    z-index: 20;
+  }
+  .overlay.hidden { display: none; }
+  .overlay img {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    margin-bottom: 16px;
+  }
+  .overlay h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .overlay p {
+    font-size: 15px;
+    line-height: 1.55;
+    color: #4a5c4b;
+    max-width: 340px;
+    margin-bottom: 10px;
+  }
+  .rules {
+    text-align: left;
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin: 16px 0 22px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 340px;
+    width: 100%;
+    box-shadow: 0 4px 16px rgba(60,100,60,0.08);
+  }
+  .rules li { margin-left: 18px; margin-bottom: 5px; }
+  .rules li:last-child { margin-bottom: 0; }
+  .btn {
+    padding: 15px 40px;
+    font-size: 16px;
+    font-weight: 600;
+    font-family: inherit;
+    color: #fff;
+    background: #43a047;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.18s;
+  }
+  .btn:hover { background: #388e3c; }
+  .btn:active { transform: scale(0.97); }
+
+  .result-stats {
+    font-size: 16px;
+    font-weight: 600;
+    color: #4a5c4b;
+    margin: 10px 0 4px;
+  }
+  .result-verdict {
+    font-size: 16px;
+    line-height: 1.5;
+    background: #f1f8e9;
+    border-left: 4px solid #81c784;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin: 16px 0 22px;
+    max-width: 340px;
+  }
+
+  .flash {
+    position: absolute;
+    inset: 0;
+    background: rgba(229, 57, 53, 0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    z-index: 5;
+  }
+  .flash.on { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="game">
+  <canvas id="field"></canvas>
+
+  <div class="hud">
+    <div class="hud-row">
+      <span class="score" id="score">Очки: 0</span>
+      <span id="speedLabel">Скорость: 1×</span>
+    </div>
+    <div class="hunger-track">
+      <div class="bar-green" id="barGreen"></div>
+      <div class="bar-red" id="barRed"></div>
+    </div>
+  </div>
+
+  <div class="flash" id="flash"></div>
+
+  <!-- Стартовый экран -->
+  <div class="overlay" id="startScreen">
+    <img src="kostik-head.png" alt="Костик">
+    <h1>Костик проголодался</h1>
+    <p>Помоги Костику наесться. Собирай полезную еду и уворачивайся от вредной.</p>
+    <div class="rules">
+      <strong>Как играть:</strong>
+      <ul>
+        <li>Свайпай по экрану, чтобы менять направление</li>
+        <li>🍎 🍐 🥦 🥕 — заполняют шкалу зелёным, +1 очко</li>
+        <li>🍟 🍔 🍩 🍭 — заполняют красным, −1 очко и ускоряют на 3 сек</li>
+        <li>Шкала заполнится — узнаешь, чем закончился обед</li>
+        <li>Стена — конец игры</li>
+      </ul>
+    </div>
+    <button class="btn" id="startBtn">Накормить Костика</button>
+  </div>
+
+  <!-- Экран итога -->
+  <div class="overlay hidden" id="endScreen">
+    <img src="kostik-head.png" alt="Костик">
+    <h1 id="endTitle">Обед окончен</h1>
+    <div class="result-stats" id="endStats"></div>
+    <div class="result-verdict" id="endVerdict"></div>
+    <button class="btn" id="againBtn">Ещё раз</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  "use strict";
+
+  const canvas = document.getElementById('field');
+  const ctx = canvas.getContext('2d');
+  const gameEl = document.getElementById('game');
+
+  const startScreen = document.getElementById('startScreen');
+  const endScreen = document.getElementById('endScreen');
+  const startBtn = document.getElementById('startBtn');
+  const againBtn = document.getElementById('againBtn');
+  const scoreEl = document.getElementById('score');
+  const speedLabel = document.getElementById('speedLabel');
+  const barGreen = document.getElementById('barGreen');
+  const barRed = document.getElementById('barRed');
+  const flash = document.getElementById('flash');
+
+  const endTitle = document.getElementById('endTitle');
+  const endStats = document.getElementById('endStats');
+  const endVerdict = document.getElementById('endVerdict');
+
+  // ---------- Картинка головы ----------
+  const headImg = new Image();
+  let headLoaded = false;
+  headImg.onload = () => { headLoaded = true; };
+  headImg.src = 'kostik-head.png';
+
+  // ---------- Константы ----------
+  const GOOD_FOOD = ['🍎', '🍐', '🥦', '🥕'];
+  const BAD_FOOD  = ['🍟', '🍔', '🍩', '🍭'];
+
+  const BASE_SPEED = 2.6;        // пикселей за кадр (при 60fps)
+  const BOOST_MULT = 1.9;        // во сколько раз ускоряет вредная еда
+  const BOOST_TIME = 3000;       // мс
+  const FOOD_RADIUS = 26;
+  const HEAD_RADIUS = 26;
+  const HUNGER_STEP = 10;        // +10% за каждую еду
+  const FOOD_COUNT = 7;          // сколько еды на поле одновременно
+
+  // ---------- Состояние ----------
+  let W = 0, H = 0;
+  let dpr = 1;
+
+  let head = { x: 0, y: 0, vx: 1, vy: 0 };
+  let foods = [];
+  let score = 0;
+  let greenTotal = 0;
+  let redTotal = 0;
+  let boostUntil = 0;
+  let running = false;
+  let lastTime = 0;
+  let rafId = null;
+  let swipeStart = null;
+
+  // ---------- Ресайз ----------
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    W = gameEl.clientWidth;
+    H = gameEl.clientHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- Еда ----------
+  function spawnFood() {
+    const isGood = Math.random() < 0.55;
+    const emoji = isGood
+      ? GOOD_FOOD[Math.floor(Math.random() * GOOD_FOOD.length)]
+      : BAD_FOOD[Math.floor(Math.random() * BAD_FOOD.length)];
+
+    const margin = FOOD_RADIUS + 10;
+    // чтобы еда не появлялась слишком близко к голове
+    let x, y, tries = 0;
+    do {
+      x = margin + Math.random() * (W - margin * 2);
+      y = margin + 70 + Math.random() * (H - margin * 2 - 90);
+      tries++;
+    } while (Math.hypot(x - head.x, y - head.y) < 120 && tries < 20);
+
+    const lifeTime = isGood ? 9000 : 6000; // полезная живёт 9 сек, вредная — 6 сек
+    foods.push({ x, y, emoji, good: isGood, born: performance.now(), lifeTime }); }
+
+
+  function fillFoods() {
+    while (foods.length < FOOD_COUNT) spawnFood();
+  }
+
+  // ---------- Свайпы ----------
+  gameEl.addEventListener('touchstart', onDown, { passive: false });
+  gameEl.addEventListener('touchmove', onMove, { passive: false });
+  gameEl.addEventListener('touchend', onUp, { passive: false });
+  gameEl.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+
+  function onDown(e) {
+    if (!running) return;
+    const p = getPoint(e);
+    swipeStart = { x: p.x, y: p.y };
+  }
+  function onMove(e) {
+    if (!running || !swipeStart) return;
+    const p = getPoint(e);
+    const dx = p.x - swipeStart.x;
+    const dy = p.y - swipeStart.y;
+    if (Math.hypot(dx, dy) > 28) {
+      if (Math.abs(dx) > Math.abs(dy)) {
+        setDirection(dx > 0 ? 1 : -1, 0);
+      } else {
+        setDirection(0, dy > 0 ? 1 : -1);
+      }
+      swipeStart = null;
+      if (e.cancelable) e.preventDefault();
+    }
+  }
+  function onUp() { swipeStart = null; }
+
+  function getPoint(e) {
+    if (e.touches && e.touches.length) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    if (e.changedTouches && e.changedTouches.length) {
+      return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    }
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  function setDirection(dx, dy) {
+    const len = Math.hypot(dx, dy) || 1;
+    head.vx = dx / len;
+    head.vy = dy / len;
+  }
+
+    // Управление стрелками и WASD
+  window.addEventListener('keydown', (e) => {
+    if (!running) return;
+    const k = e.key.toLowerCase();
+    if (k === 'arrowleft' || k === 'a') { setDirection(-1, 0); e.preventDefault(); }
+    if (k === 'arrowright' || k === 'd') { setDirection(1, 0); e.preventDefault(); }
+    if (k === 'arrowup' || k === 'w') { setDirection(0, -1); e.preventDefault(); }
+    if (k === 'arrowdown' || k === 's') { setDirection(0, 1); e.preventDefault(); }
+  });
+
+  // ---------- Игровой цикл ----------
+  function startGame() {
+    resize();
+    score = 0;
+    greenTotal = 0;
+    redTotal = 0;
+    boostUntil = 0;
+    foods = [];
+    head.x = W / 2;
+    head.y = H / 2 + 30;
+    setDirection(1, 0);
+    updateScore();
+    updateBars();
+    updateSpeedLabel();
+    fillFoods();
+
+    startScreen.classList.add('hidden');
+    endScreen.classList.add('hidden');
+
+    running = true;
+    lastTime = performance.now();
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function loop(now) {
+    if (!running) return;
+    const dt = Math.min(50, now - lastTime);
+    lastTime = now;
+    update(dt, now);
+    draw(now);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function currentSpeed() {
+    const boost = performance.now() < boostUntil;
+    return BASE_SPEED * (boost ? BOOST_MULT : 1);
+  }
+
+  function update(dt, now) {
+    const speed = currentSpeed();
+    const step = speed * (dt / 16.67);
+
+    head.x += head.vx * step;
+    head.y += head.vy * step;
+
+    // стены
+    if (head.x < HEAD_RADIUS || head.x > W - HEAD_RADIUS ||
+        head.y < HEAD_RADIUS + 60 || head.y > H - HEAD_RADIUS) {
+      gameOver('wall');
+      return;
+    }
+    // столкновение с едой и проверка времени жизни
+    for (let i = foods.length - 1; i >= 0; i--) {
+      const f = foods[i];
+      // Если еда «просрочена» — убираем её без очков
+      if (now - f.born > f.lifeTime) {
+        foods.splice(i, 1);
+        continue;
+      }
+      // Если Костик съел — обрабатываем
+      if (Math.hypot(head.x - f.x, head.y - f.y) < HEAD_RADIUS + FOOD_RADIUS * 0.6) {
+        eatFood(f);
+        foods.splice(i, 1);
+      }
+    }
+    fillFoods();
+
+    if (greenTotal + redTotal >= 100) {
+      gameOver('full');
+    }
+  }
+
+  function eatFood(f) {
+    if (f.good) {
+      greenTotal = Math.min(100 - redTotal, greenTotal + HUNGER_STEP);
+      score += 1;
+    } else {
+      redTotal = Math.min(100 - greenTotal, redTotal + HUNGER_STEP);
+      score -= 1;
+      boostUntil = performance.now() + BOOST_TIME;
+      flash.classList.add('on');
+      setTimeout(() => flash.classList.remove('on'), 150);
+    }
+    updateScore();
+    updateBars();
+    updateSpeedLabel();
+  }
+
+  function updateScore() {
+    scoreEl.textContent = 'Очки: ' + score;
+  }
+  function updateBars() {
+    barGreen.style.width = greenTotal + '%';
+    barRed.style.width = redTotal + '%';
+  }
+  function updateSpeedLabel() {
+    const boosted = performance.now() < boostUntil;
+    speedLabel.textContent = 'Скорость: ' + (boosted ? '2×' : '1×');
+  }
+
+  // ---------- Рисование ----------
+  function draw(now) {
+    // фон поля
+    ctx.clearRect(0, 0, W, H);
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#f3faf0');
+    grad.addColorStop(1, '#e4f1df');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    // мягкие «пятна» на фоне
+    ctx.fillStyle = 'rgba(160, 210, 160, 0.12)';
+    for (let i = 0; i < 5; i++) {
+      const bx = ((i * 173 + now * 0.01) % (W + 200)) - 100;
+      const by = ((i * 97) % H);
+      ctx.beginPath();
+      ctx.arc(bx, by, 80, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // еда
+    for (const f of foods) {
+      const age = now - f.born;
+      const timeLeft = f.lifeTime - age;
+      // Мигание за 2 секунды до исчезновения
+      if (timeLeft < 2000 && Math.floor(timeLeft / 200) % 2 === 0) continue; // пропускаем кадр — еда мигает
+      const s = Math.min(1, age / 220);
+      const bounce = 1 + Math.sin(now / 300 + f.x) * 0.06;
+      // Добавляем тень для объема и насыщенности
+      ctx.shadowColor = 'rgba(0,0,0,0.15)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetY = 3;
+      
+      // Увеличиваем размер и используем шрифт с поддержкой цветных эмоджи
+      ctx.font = Math.round(FOOD_RADIUS * 1.8 * s * bounce) + 'px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(f.emoji, f.x, f.y);
+      
+      // Сбрасываем тень, чтобы она не влияла на другие элементы
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+    }
+
+
+
+    // след от головы при ускорении
+    if (now < boostUntil) {
+      ctx.fillStyle = 'rgba(229, 57, 53, 0.18)';
+      for (let i = 1; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.arc(head.x - head.vx * i * 10, head.y - head.vy * i * 10, HEAD_RADIUS * (1 - i * 0.2), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // голова
+    const bob = Math.sin(now / 260) * 2;
+    const hx = head.x;
+    const hy = head.y + bob;
+
+    if (headLoaded) {
+      const size = HEAD_RADIUS * 2.4;
+      // небольшой поворот в сторону движения
+      const angle = Math.atan2(head.vy, head.vx);
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(angle * 0.15);
+      ctx.drawImage(headImg, -size / 2, -size / 2, size, size);
+      ctx.restore();
+    } else {
+      // заглушка — кружок с глазами
+      ctx.fillStyle = '#f5e6d3';
+      ctx.beginPath();
+      ctx.arc(hx, hy, HEAD_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#2e3d2f';
+      ctx.beginPath();
+      ctx.arc(hx - 8, hy - 4, 5, 0, Math.PI * 2);
+      ctx.arc(hx + 8, hy - 4, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // ---------- Конец игры ----------
+  function gameOver(reason) {
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+
+    let title = '';
+    let verdict = '';
+
+    if (reason === 'wall') {
+      title = 'Ой!';
+      verdict = 'Костик врезался в стену. Иногда полезно остановиться и осмотреться.';
+    } else {
+      const total = greenTotal + redTotal;
+      const greenPct = total ? Math.round((greenTotal / total) * 100) : 0;
+      const redPct = 100 - greenPct;
+
+      if (greenPct >= 70) {
+        title = 'Костик поел!';
+        verdict = 'Костик поел и полон энергии! Такой обед явно пошёл ему на пользу.';
+      } else if (redPct >= 70) {
+        title = 'Костик наелся…';
+        verdict = 'Костик наелся, но у него совершенно нет сил. Слишком много быстрых углеводов.';
+      } else {
+        title = 'Обед закончен';
+        verdict = 'Костик поел, но баланс получился шаткий: и силы есть, и тяжесть осталась.';
+      }
+    }
+
+    endTitle.textContent = title;
+    endStats.textContent = `Очки: ${score} · Зелёное: ${Math.round(greenTotal)}% · Красное: ${Math.round(redTotal)}%`;
+    endVerdict.textContent = verdict;
+    endScreen.classList.remove('hidden');
+  }
+
+  // ---------- Кнопки ----------
+  startBtn.addEventListener('click', startGame);
+  againBtn.addEventListener('click', startGame);
+
+  // ---------- Инициализация ----------
+  resize();
+  head.x = W / 2;
+  head.y = H / 2;
+})();
+</script>
+</body>
+</html>
